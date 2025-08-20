@@ -32,11 +32,16 @@ async def handle_errors(coro: Awaitable[T]) -> T:
     except IntegrityError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"DB integrity error: {e.orig}")
 
+
+
 async def run_tx(uow: UnitOfWork, fn: Callable[[], Awaitable[T]]) -> T:
     try:
         result = await fn()
         await uow.commit()
         return result
-    except StaleDataError:
+    except IntegrityError:
         await uow.rollback()
-        raise ConcurrencyError("This resource was updated by another process. Please retry.")
+        raise
+    except Exception:
+        await uow.rollback()
+        raise

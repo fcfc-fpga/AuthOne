@@ -24,6 +24,7 @@ class UnitOfWork:
 
     async def __aenter__(self) -> "UnitOfWork":
         self._session = self._session_factory()
+        await self._session.begin()
         self.accounts = AccountRepository(self._session)
         self.groups = GroupRepository(self._session)
         self.permissions = PermissionRepository(self._session)

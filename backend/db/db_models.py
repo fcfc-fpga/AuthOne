@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from typing import Optional, Any
 
-from sqlalchemy import String, Text, Boolean, ForeignKey, UniqueConstraint, JSON, Index, Integer
+from sqlalchemy import String, Text, Boolean, ForeignKey, UniqueConstraint, JSON, Index, Integer, select
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
@@ -141,29 +141,12 @@ class AuditLogModel(Base):
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
-# ---------------- Casbin rule table (persist policies) ----------------
-class CasbinRule(Base):
-    __tablename__ = "casbin_rules"
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    ptype: Mapped[str] = mapped_column(String(256), nullable=False)
-    v0: Mapped[str] = mapped_column(String(256), nullable=False)
-    v1: Mapped[str] = mapped_column(String(256), nullable=False)
-    v2: Mapped[str] = mapped_column(String(256), nullable=False)
-    v3: Mapped[str] = mapped_column(String(256), nullable=False)
-    v4: Mapped[str] = mapped_column(String(256), nullable=False)
-    v5: Mapped[str] = mapped_column(String(256), nullable=False)
-
-    __table_args__ = (
-        Index("ix_casbin_rule_all", "ptype", "v0", "v1", "v2", "v3", "v4", "v5"),
-    )
-
-
 async def init_engine(db_url: str) -> None:
     global _engine, _session_factory
     _engine = create_async_engine(db_url, echo=False, pool_pre_ping=True)
 
-    async with _engine.begin() as conn:
-        await conn.run_sync(lambda c: None)
+    async with _engine.connect() as conn:
+        await conn.execute(select(1))
 
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
 

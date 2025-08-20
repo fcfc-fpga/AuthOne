@@ -13,12 +13,12 @@ from .db.db_models import init_engine, init_db, dispose_engine, get_sessionmaker
 from .service.auth_service import AuthService
 from .api.__all_routers__ import all_routers
 
-def _build_enforcer(settings: AppSettings) -> AsyncEnforcer:
+async def _build_enforcer(settings: AppSettings) -> AsyncEnforcer:
     adapter = AsyncCasbinAdapter(settings.db_url)
+    await adapter.create_table()  # 确保存在默认表
+
     # 用默认表即可，确保存在
     # （若要自定义表，请改成自己的表模型，并不要调用 create_table）
-    # 这句会消掉你看到的 RuntimeWarning
-    #（已经把这句放到 lifespan 里执行）
     enforcer = AsyncEnforcer(settings.casbin.model_path, adapter)
     if settings.casbin.register_key_match:
         enforcer.add_function("keyMatch", key_match_func)
@@ -49,16 +49,14 @@ def create_app() -> FastAPI:
         await init_db(settings.init_db_drop_all)
 
         # Casbin
-        adapter = AsyncCasbinAdapter(settings.db_url)
-        await adapter.create_table()  # 默认表，显式建一次，去掉警告
-
-        enforcer = _build_enforcer(settings)
+        enforcer = await _build_enforcer(settings)
         await enforcer.load_policy()
         enforcer.enable_auto_save(settings.casbin.enable_auto_save)
 
         # Service
         svc = AuthService(enforcer)
-        # 注入配置给 service（替换你代码里的硬编码映射）
+        
+        # TODO RESOURCE_TO_PATTERN 这个操作很烂，建议改掉
         svc.RESOURCE_TO_PATTERN = settings.resource_to_pattern  # type: ignore[attr-defined]
 
         app.state.svc = svc
@@ -70,7 +68,7 @@ def create_app() -> FastAPI:
         finally:
             await dispose_engine()
 
-    app = FastAPI(title=settings.app_name, lifespan=lifespan)
+    app = FastAPI(title = settings.app_name, lifespan = lifespan)
     _install_cors(app, settings)
     _install_routers(app)
     return app

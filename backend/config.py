@@ -37,8 +37,5 @@ class AppSettings(BaseSettings):
         "doc": "/docs/*",
     })
 
-    # 删除幂等化：重复删除返回 204 而非 404
-    delete_idempotent: bool = False
-
 def get_settings() -> AppSettings:
     return AppSettings()

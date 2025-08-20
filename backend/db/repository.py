@@ -31,10 +31,11 @@ class Repository(abc.ABC, Generic[T]):
         self._session.add(entity)
 
     async def delete(self, id: UUID) -> bool:
-        result = await self._session.execute(
-            delete(self._model).where(self._model.id == id)
-        )
-        return result.rowcount > 0
+        obj = await self._session.get(self._model, id)
+        if not obj:
+            return False
+        await self._session.delete(obj) 
+        return True
 
 
 class PermissionRepository(Repository[PermissionModel]):
